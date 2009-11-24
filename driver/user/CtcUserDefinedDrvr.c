@@ -269,7 +269,6 @@ CtcUserIoctl(
              int         com,  /*  */
              char        *arg) /*  */
 {
-	CTCUserStatics_t *usp =  sptr->usrs; /* user statistics table */
 	int i;
 	CTCBlock01_t *ptr = sptr->card->block01;
 
