@@ -1,0 +1,6 @@
+#!/bin/bash
+
+echo 8 > /proc/sys/kernel/printk
+
+# tsi driver
+insmod /acc/src/dsc/drivers/coht/.__kitchen/ygeorgie/vmebridge/object_vmebus/vmebus.`uname -r`.ko;
