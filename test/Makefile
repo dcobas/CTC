@@ -6,6 +6,21 @@ DRVRDIR    = object_$(DRVR)
 INSTDIR    = $(addsuffix /$(DLVRYPLS)/$(CPU), $(EXECINSTDIR))
 ADDCFLAGS  = $(STDFLAGS)
 
+# We will link with local DAL copy (if any)
+# Otherwise will link with general DAL copy
+define create-lib-symlink
+	if [ ! -d ../../general/dal ]; then                 \
+			echo '  SYMLINK $@ -> /acc/local/$(CPU)/lib'; \
+			ln -fs /acc/local/$(CPU)/lib/libdal.a $@;     \
+	else \
+			echo '  SYMLINK $@ -> ../../general/dal'; \
+			ln -fs ../../general/dal/libdal.$(CPU).a $@; \
+	fi
+endef
+
+../object_$(DRVR)/libdal.$(CPU).a: FORCE
+	$(Q)$(create-lib-symlink)
+
 # libraries (and their pathes) to link executable file with
 XTRALIBDIRS = ../../general/dal ../object_$(DRVR)
 LOADLIBES  := $(addprefix -L,$(XTRALIBDIRS)) $(LOADLIBES)
@@ -27,7 +42,7 @@ INCDIRS = \
 
 EXEC_OBJS = $(DRVR)Test.$(CPU)
 
-$(EXEC_OBJS): $(OBJFILES)
+$(EXEC_OBJS): $(OBJFILES) ../object_$(DRVR)/libdal.$(CPU).a
 
 _build: $(EXEC_OBJS) $(OBJDIR) move_objs
 

@@ -1,7 +1,57 @@
 #ifndef _CTC_GET_SET_REG_H_INCLUDE_
 #define _CTC_GET_SET_REG_H_INCLUDE_
 
-/* Get/Set functions that can be used inside the user part of the driver */
+/*
+  These functions are used to deliver register values directly to the user
+  space.
+
+  API is the following:
+  1 param -- statics table
+
+  2 param -- ioctl argument in predefined format:
+             Massive of 3 elements, each is 4 bytes long.
+             [0] - user-space address
+             [1] - number of elements to r/w
+             [2] - element index, starting from zero
+
+             In case of service registers -- ioctl arguments can vary.
+             Their amount depends on specific ioctl number.
+             See service routines (those are with __SRV__ subword)
+             for more details on parameter amount.
+
+             For example, if this is a repetitive r/w request
+             (ioctl number is SRV__REP_REG_RW) then we should have 4 arguments,
+             that are packed as follows:
+
+             [0] -- ioctl number
+             [1] -- user-space address
+             [2] -- number of elements to r/w
+             [3] -- element index, starting from zero
+
+  3 param -- check r/w bounds (1 - yes, 0 - no)
+             valid only in case of Lynx
+  4 param -- repeatedly read register (1 - yes, 0 - no)
+
+
+  Bear in mind, that r/w operation results goes diretly to the user space.
+  If you want to operate on the HW registers inside the driver -- use
+  low-level port operation functions from port_ops_[linux/lynx].h like:
+  __inb      -- read a byte from a port
+  __inw      -- read a word from a port
+  __in       -- lread a long from a port
+  __outb     -- write a byte to a port
+  __outw     -- write a word to a port
+  __outl     -- write a long to a port
+  __rep_inb  -- read multiple bytes from a port into a buffer
+  __rep_inw  -- read multiple words from a port into a buffer
+  __rep_inl  -- read multiple longs from a port into a buffer
+  __rep_outb -- write multiple bytes to a port from a buffer
+  __rep_outw -- write multiple words to a port from a buffer
+  __rep_outl -- write multiple longs to a port from a buffer
+
+  These functions are used to r/w HW registers inside the driver.
+  Never access registers directly. Use this function to do this.
+*/
 
 /* Service register operations */
 int get___SRV__DEBUG_FLAG(register CTCStatics_t*, char*, int, int);

@@ -8,10 +8,9 @@
 /* save write-only register last written value */
 #define WO_WRITE(_wo_data) *wop++ = *(_wo_data)
 
-
 /**
- * DriverGen ioctl numbers and get their parameters
- * ------------------------------------------------
+ * ioctl numbers and their parameters
+ * ----------------------------------
 
  * All DriverGen ioctl arguments are comming in predefined format.
  *
@@ -20,9 +19,9 @@
  * arg[1] -- number of elements to r/w
  * arg[2] -- element index, starting from zero
  *
- * In case of service ioctl - arguments can vary Their amount depends on
+ * In case of service ioctl - arguments can vary. Their amount depends on
  * specific ioctl number. See service routines (those are with __SRV__ subword)
- * for more details on parameter amount.
+ * for complete details on parameter amount.
  *
  * For example, if this is a repetitive r/w request
  * (ioctl number is SRV__REP_REG_RW) then we should have 4 arguments,
@@ -81,9 +80,8 @@ do {								\
 
 #endif
 
-
 /**
- * @brief user-space boundaries checking for register writing operation
+ * @brief user-space boundaries checker for register writing operation
  *
  * @param s     -- statics table
  * @param crwb  -- if to check r/w boundaries. Valid only for Lynx
@@ -91,8 +89,8 @@ do {								\
  * @param size  -- data size in user space
  * @param back  -- backup user-space address. Valid only for Linux
  *
- * User-space Read bounds assertion. System-specific.
- * Called every time, register write operations are performed
+ * Assert read bounds.
+ * Called every time register write operations are performed.
  *
  * @return SYSERR - failed
  * @return OK     - success
@@ -125,9 +123,8 @@ static int assert_rbounds(CTCStatics_t *s, int crwb,
 	return OK; /* 0 */
 }
 
-
 /**
- * @brief user-space boundaries checking for register reading operation
+ * @brief user-space boundaries checker for register reading operation
  *
  * @param s     -- statics table
  * @param crwb  -- if to check r/w boundaries. Valid only for Lynx
@@ -135,8 +132,8 @@ static int assert_rbounds(CTCStatics_t *s, int crwb,
  * @param size  -- data size (in bytes) in user space
  * @param back  -- backup user-space address. Valid only for Linux
  *
- * User-space Write bounds assertioin. System-specific.
- * Called everytime, register read operations are performed
+ * Assert write bounds.
+ * Called everytime register read operations are performed
  *
  * @return SYSERR - failed
  * @return OK     - success
@@ -162,6 +159,59 @@ static int assert_wbounds(CTCStatics_t *s, int crwb,
 #endif
 	return OK;		/* 0 */
 }
+
+/**
+ * @brief If DPS < Register Size -- we need to swap bytes (Linux only)
+ *
+ * @param kaddr  -- data address
+ * @param rcntr  -- registers amount
+ * @param vector -- swap vector
+
+ * @param rsz   -- register size (in bytes) {2, 4, 8}
+ * @param rwoa  -- read/write operation amount {2, 4, 8}
+ *
+ * If Data Port Size is smaller than Register Size -- this is a singular
+ * register.
+ *
+ * byte       -- 8  bit
+ * word       -- 16 bit
+ * dword      -- 32 bit
+ * long dword -- 64 bit
+ */
+#ifdef __Lynx__
+#define swap_data(kaddr, rcntr, vector)
+#else  /* __linux__ */
+
+/* stabs. Will never be called. Needed only for functioin generation */
+static inline void dg_swab8(char   **addr) { BUG(); }
+static inline void dg_swaw16(char  **addr) { BUG(); }
+static inline void dg_swal32(char  **addr) { BUG(); }
+static inline void dg_swall64(char **addr) { BUG(); }
+
+/* these one are actually used */
+static inline void dg_swab16(char **addr)
+{ swab16s((__u16 *)*addr);  *addr += 2; }
+
+static inline void dg_swab32(char **addr)
+{ swab32s((__u32 *)*addr);  *addr += 4; }
+static inline void dg_swaw32(char **addr)
+{ swahw32s((__u32 *)*addr); *addr += 4; }
+
+static inline void dg_swab64(char **addr)
+{ swab64s((__u64 *)*addr);  *addr += 8; }
+static inline void dg_swaw64(char **addr)
+{ swahw64s((__u64 *)*addr); *addr += 8; }
+static inline void dg_swal64(char **addr)
+{ swahl64s((__u64 *)*addr); *addr += 8; }
+
+static inline void swap_data(char *kaddr, int rcntr, void (*vector)(char **))
+{
+	int i;
+
+	for (i = 0; i < rcntr; i++)
+		vector(&kaddr);
+}
+#endif
 
 /**
  * @brief Called to finish register reading operation
@@ -208,7 +258,6 @@ static int end_write(CTCStatics_t *s, char *kaddr)
 	return OK; /* 0 */
 }
 
-
 /**
  * @brief Scalar Register [1 element long] reading
  *
@@ -226,19 +275,18 @@ static int end_write(CTCStatics_t *s, char *kaddr)
  * @return SYSERR - success
  * @return OK     - failed
  */
-#define GET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op) \
+#define GET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz)	\
 int get_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 		int crwb, int r_rw)					\
 {									\
-	int rwoa; /* Read Operation Amount (min 1). If register is	\
-		     bigger than Data Port Size (DPS), then it will be	\
-		     read in parts. If this value is > 1 - register is	\
-		     considered to be singular one */			\
-									\
+	int rwoa; /* Read Operation Amount {1, 2, 4, 8}			\
+		     If register is bigger than Data Port Size (DPS),	\
+		     then it will be read in parts. If this value	\
+		     is > 1 - register is considered to be singular one */ \
 	unsigned _r_type *regp;  /* register to get */			\
 	unsigned _r_type *uaddr; /* user-space buffer pointer */	\
 	char *uaddr_back;	 /* backup user-space address */	\
-	int rcntr; /* how many times to read (min 1) */			\
+	int rcntr; /* how many times to repetitive read (min 1) */	\
 	int ridx;  /* register index					\
 		      always 0 in case of scalar register */		\
 									\
@@ -264,22 +312,24 @@ int get_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 									\
 	/* check (and prepare in case of Linux) user buffer */		\
 	if (assert_wbounds(s, crwb, (char **) &uaddr,			\
-			   rcntr * rwoa * sizeof(unsigned _r_type),	\
+			   rcntr*rwoa*sizeof(unsigned _r_type),		\
 			   &uaddr_back))				\
 		return SYSERR;						\
 									\
 	/* read from device */						\
 	if (r_rw)							\
 		/* repetitive read access */				\
-		__rep_in##_r_port_op((__port_addr_t)regp, uaddr, rcntr * rwoa);	\
+		__rep_in##_r_port_op((__port_addr_t)regp, uaddr, rcntr*rwoa); \
 	else								\
 		__rep_in##_r_port_op##_delay_shift((__port_addr_t)regp, uaddr, \
 					   rwoa, _r_tloop);		\
 									\
+	if (rwoa > 1) /* singular reg. should swap data bytes (Linux only) */ \
+		swap_data((char *)uaddr, rcntr, dg_swa##_r_port_op##_rsz); \
+									\
 	return end_read(s, (char *)uaddr, rcntr*rwoa*sizeof(unsigned _r_type), \
 			uaddr_back);					\
 }
-
 
 /**
  * @brief Non-scalar Register [several elements long] reading
@@ -298,15 +348,14 @@ int get_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
  * @return SYSERR - success
  * @return OK     - failed
  */
-#define GET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op) \
+#define GET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz) \
 int get_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 		int crwb, int r_rw)					\
 {									\
-	int rwoa; /* Read Operation Amount (min 1). If register is bigger \
-		     than Data Port Size (DPS), then it will be read	\
-		     in parts. If this value is > 1 - register is	\
-		     considered to be singular one */			\
-									\
+	int rwoa; /* Read Operation Amount {1, 2, 4, 8}			\
+		     If register is bigger than Data Port Size (DPS),	\
+		     then it will be read in parts. If this value	\
+		     is > 1 - register is considered to be singular one */ \
 	unsigned _r_type *regp; /* register to get */			\
 	unsigned _r_type *uaddr; /* user-space buffer pointer to put results */	\
 	char *uaddr_back;	 /* backup user-space address */	\
@@ -344,28 +393,26 @@ int get_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 		return SYSERR; /* -1 */					\
 	}								\
 									\
-	/* take into accout amount of register elements */		\
-	rwoa *= rcntr;							\
-									\
 	/* check (and prepare in case of Linux) user buffer */		\
 	if (assert_wbounds(s, crwb, (char **)&uaddr,			\
-			   rwoa * sizeof(unsigned _r_type),		\
+			   rcntr * rwoa * sizeof(unsigned _r_type),	\
 			   &uaddr_back))				\
 		return SYSERR;						\
 									\
 	if (r_rw)							\
 		/* repetitive read access */				\
-		__rep_in##_r_port_op((__port_addr_t)regp, uaddr, rwoa);	\
+		__rep_in##_r_port_op((__port_addr_t)regp, uaddr, rcntr * rwoa);	\
 	else								\
 		/* all OK - put data in the user buffer */		\
-		__rep_in##_r_port_op##_delay_shift((__port_addr_t)regp,	\
-						   uaddr, rwoa,		\
-						   _r_tloop);		\
+		__rep_in##_r_port_op##_delay_shift((__port_addr_t)regp, uaddr, \
+						   rcntr * rwoa, _r_tloop); \
 									\
-	return end_read(s, (char *)uaddr, rwoa*sizeof(unsigned _r_type), \
+	if (rwoa > 1) /* singular reg. should swap data bytes (Linux only) */ \
+		swap_data((char *)uaddr, rcntr, dg_swa##_r_port_op##_rsz); \
+									\
+	return end_read(s, (char *)uaddr, rcntr*rwoa*sizeof(unsigned _r_type), \
 			uaddr_back);					\
 }
-
 
 /**
  * @brief Scalar Register [1 element long] writing
@@ -385,15 +432,14 @@ int get_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
  * @return SYSERR - success
  * @return OK     - failed
  */
-#define SET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _r_woinit, _r_wow) \
+#define SET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz, _r_woinit, _r_wow) \
 int set_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 		int crwb, int r_rw)					\
 {									\
-	int rwoa; /* Write Operation Amount (min 1). If register is bigger \
-		     than Data Port Size (DPS), then it will be written in \
-		     parts. If this value is > 1 - register is considered to \
-		     be singular one */					\
-									\
+	int rwoa; /* Write Operation Amount {1, 2, 4, 8}.		\
+		     If register is bigger than Data Port Size (DPS),	\
+		     then it will be written in parts. If this value	\
+		     is > 1 - register is considered to be singular one */ \
 	unsigned _r_type *regp;  /* register to set */			\
 	unsigned _r_type *uaddr; /* user-space address data pointer */	\
 	char *uaddr_back;	 /* backup user-space address */	\
@@ -434,22 +480,34 @@ int set_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 			   &uaddr_back))				\
 		return SYSERR;						\
 									\
-	if (r_rw) {							\
-		/* repetitive write */					\
+	if (r_rw) { /* repetitive write */				\
+									\
+		/* save last written value (if write-only reg) */	\
+		_r_wow(uaddr);						\
+									\
+		if (rwoa > 1)						\
+			/* singular reg. should swap data bytes (Linux only) */	\
+			swap_data((char *)uaddr, rcntr, dg_swa##_r_port_op##_rsz); \
+									\
+		/* write into hw */					\
 		__rep_out##_r_port_op((__port_addr_t)regp, uaddr, rcntr * rwoa); \
-		_r_wow(uaddr); /* save last written value for write-only reg */	\
-	} else {							\
-	/* single write */						\
-	__rep_out##_r_port_op##_delay_shift((__port_addr_t)regp, uaddr,	\
-					    rwoa, _r_tloop);		\
-	/* second - save last written values for write-only reg */	\
-	for (i = 0; i < rwoa; i++)					\
-		_r_wow(&uaddr[i]);					\
+	} else { /* single write */					\
+									\
+		/* save last written values (if write-only reg) */	\
+		for (i = 0; i < rwoa; i++)				\
+			_r_wow(&uaddr[i]);				\
+									\
+		if (rwoa > 1)						\
+			/* singular reg. should swap data bytes (Linux only) */	\
+			swap_data((char *)uaddr, rcntr, dg_swa##_r_port_op##_rsz); \
+									\
+		/* write into hw */					\
+		__rep_out##_r_port_op##_delay_shift((__port_addr_t)regp, uaddr,	\
+						    rwoa, _r_tloop);	\
 	}								\
 									\
 	return end_write(s, (char *)uaddr);				\
 }
-
 
 /**
  * @brief Non-scalar Register [several elements long] writing
@@ -469,14 +527,14 @@ int set_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
  * @return SYSERR - success
  * @return OK     - failed
  */
-#define SET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _r_woinit, _r_wow) \
+#define SET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz, _r_woinit, _r_wow) \
 int set_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 		int crwb, int r_rw)					\
 {									\
-	int rwoa; /* Write Operation Amount (min 1). If register is bigger \
-		     than Data Port Size (DPS), then it will be written in \
-		     parts. If this value is > 1 - register is considered to \
-		     be singular one */					\
+	int rwoa; /* Write Operation Amount {1, 2, 4, 8}.		\
+		     If register is bigger than Data Port Size (DPS),	\
+		     then it will be written in parts. If this value	\
+		     is > 1 - register is considered to be singular one */ \
 	unsigned _r_type *regp;  /* register to set */			\
 	unsigned _r_type *uaddr; /* user-space address data pointer */	\
 	char *uaddr_back;	 /* backup user-space address */	\
@@ -521,31 +579,40 @@ int set_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 		return SYSERR; /* -1 */					\
 	}								\
 									\
-	/* take into accout amount of register elements */		\
-	rwoa *= rcntr;							\
-									\
 	/* check (and prepare in case of Linux) usr buffer */		\
 	if (assert_rbounds(s, crwb, (char **)&uaddr,			\
-			   rwoa * sizeof(unsigned _r_type),		\
+			   rcntr * rwoa * sizeof(unsigned _r_type),	\
 			   &uaddr_back))				\
 		return SYSERR;						\
 									\
-	if (r_rw) {							\
-		/* repetitive write */					\
-		__rep_out##_r_port_op((__port_addr_t)regp, uaddr, rwoa); \
-		_r_wow(uaddr); /* save last written value for write-only reg */	\
-	} else {							\
-		/* multiple writes */					\
-		__rep_out##_r_port_op##_delay_shift((__port_addr_t)regp, uaddr,	\
-						    rwoa, _r_tloop);	\
-		/* second - save last written values for write-only reg */ \
-		for (i = 0; i < rwoa; i++)				\
+	if (r_rw) { /* repetitive write */				\
+									\
+		/* save last written value (if write-only reg) */	\
+		_r_wow(uaddr);						\
+									\
+		if (rwoa > 1)						\
+			/* singular reg. should swap data bytes (Linux only) */	\
+			swap_data((char *)uaddr, rcntr, dg_swa##_r_port_op##_rsz); \
+									\
+		/* write into hw */					\
+		__rep_out##_r_port_op((__port_addr_t)regp, uaddr, rcntr * rwoa); \
+	} else { /* multiple writes */					\
+									\
+		/* save last written values (if write-only reg) */	\
+		for (i = 0; i < rcntr * rwoa; i++)			\
 			_r_wow(&uaddr[i]);				\
+									\
+		if (rwoa > 1)						\
+			/* singular reg. should swap data bytes (Linux only) */	\
+			swap_data((char *)uaddr, rcntr, dg_swa##_r_port_op##_rsz); \
+									\
+		/* write into hw */					\
+		__rep_out##_r_port_op##_delay_shift((__port_addr_t)regp, uaddr,	\
+						    rcntr * rwoa, _r_tloop); \
 	}								\
 									\
 	return end_write(s, (char *)uaddr);				\
 }
-
 
 /**
  * @brief Non-scalar software register [several elements long] reading
@@ -618,7 +685,6 @@ int get_##_blk_idx##_##_r_nm(register CTCStatics_t *s, char *ioctlarg, \
 			uaddr_back);					\
 }
 
-
 /**
  * @brief Scalar software register [1 element long] reading
  *
@@ -671,7 +737,6 @@ int get_##_blk_idx##_##_r_nm(register CTCStatics_t *s,		\
 									\
 	return end_read(s, (char *)uaddr, sizeof(typeof (*regp)), uaddr_back); \
 }
-
 
 /**
  * @brief Non-scalar software register [several elements long] writing
@@ -743,7 +808,6 @@ int set_##_blk_idx##_##_r_nm(register CTCStatics_t *s,		\
 	return end_write(s, (char *)uaddr);				\
 }
 
-
 /**
  * @brief Scalar software register [1 element long] writing
  *
@@ -797,7 +861,6 @@ int set_##_blk_idx##_##_r_nm(register CTCStatics_t *s,		\
 	return end_write(s, (char *)uaddr);				\
 }
 
-
 /*
   For now there are 4 possible register types:
    1. read-only  real       registers
@@ -805,50 +868,62 @@ int set_##_blk_idx##_##_r_nm(register CTCStatics_t *s,		\
    3. read/write real       registers
    4. read/write extraneous registers
 
-   They all in turn are devided in:
+  They all in turn are devided in:
    A. Scalar register (consist of one element).
    B. Array  register (consist of several elements).
 
-   If module Data Port Size (DPS) is smaller than register declared size,
-   then such register will be r/w in parts.
+  If module Data Port Size (DPS) is smaller than register declared size,
+  then such register is considered to be singular and will be r/w in parts.
 
-   It's possible to do repetitive r/w on the real registers.
+  It's possible to do repetitive r/w on the real registers.
 
-   Register r/w function prototypes can be found in the header file.
+  Register r/w function prototypes can be found in the header file.
 */
 
 /* 1. read-only real registers */
-/* A */ #define RO_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op) \
-GET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op);
-/* B */ #define RO_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op) \
-GET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op);
+/* A */
+#define RO_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz) \
+	GET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz);
+
+/* B */
+#define RO_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz) \
+	GET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz);
 
 
 /* 2. write-only real registers */
-/* A */ #define WO_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op)		\
-SET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, INIT_WOP, WO_WRITE);	\
-GET_SPUR_REG_SCAL(_r_nm, wo);
-/* B */ #define WO_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op)		\
-SET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, INIT_WOP, WO_WRITE);	\
-GET_SPUR_REG_ARR(_r_nm, wo);
+/* A */
+#define WO_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz) \
+	SET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz, INIT_WOP, WO_WRITE); \
+	GET_SPUR_REG_SCAL(_r_nm, wo);
+
+/* B */
+#define WO_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz) \
+	SET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz, INIT_WOP, WO_WRITE); \
+	GET_SPUR_REG_ARR(_r_nm, wo);
 
 
 /* 3. r/w real registers */
-/* A */ #define RW_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op)		\
-SET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, NOT_WOR, NOT_WOR);	\
-GET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op);
-/* B */ #define RW_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op)		\
-SET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, NOT_WOR, NOT_WOR);	\
-GET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op);
+/* A */
+#define RW_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz) \
+	SET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz, NOT_WOR, NOT_WOR); \
+	GET_REAL_REG_SCAL(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz);
+
+/* B */
+#define RW_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz) \
+	SET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz, NOT_WOR, NOT_WOR); \
+	GET_REAL_REG_ARR(_r_nm, _r_type, _r_tloop, _blk_idx, _r_port_op, _rsz);
 
 
 /* 4. r/w extraneous registers. They are r/w by default */
-/* A */ #define EX_REG_SCAL(_r_nm)	\
-SET_SPUR_REG_SCAL(_r_nm, ex);		\
-GET_SPUR_REG_SCAL(_r_nm, ex);
-/* B */ #define EX_REG_ARR(_r_nm)	\
-SET_SPUR_REG_ARR(_r_nm, ex);		\
-GET_SPUR_REG_ARR(_r_nm, ex);
+/* A */
+#define EX_REG_SCAL(_r_nm)		\
+	SET_SPUR_REG_SCAL(_r_nm, ex);	\
+	GET_SPUR_REG_SCAL(_r_nm, ex);
+
+/* B */
+#define EX_REG_ARR(_r_nm)		\
+	SET_SPUR_REG_ARR(_r_nm, ex);	\
+	GET_SPUR_REG_ARR(_r_nm, ex);
 
 /*****************************************************************************/
 /*                                                                           */
@@ -1133,116 +1208,116 @@ int get___SRV__DAL_CONSISTENT(register CTCStatics_t *s,
  *
  * This is a Normal register.
  */
-RO_REG_SCAL(STATUS, long, 0, block00, l);
+RO_REG_SCAL(STATUS, long, 0, block00, l, 32);
 
 /**
  * @brief Enable/disable output channel
  *
  * This is a Normal register.
  */
-RW_REG_SCAL(CNTR_ENABLE, long, 0, block00, l);
+RW_REG_SCAL(CNTR_ENABLE, long, 0, block00, l, 32);
 
 /**
  * @brief Select External start (i.e. input channel) and Clock1/Clock2 settings
  *
  * This is a Normal register.
  */
-RW_REG_SCAL(confChan, long, 0, block01, l);
+RW_REG_SCAL(confChan, long, 0, block01, l, 32);
 
 /**
  * @brief How many ticks to wait (i.e. delay) for the 1'st counter
  *
  * This is a Normal register.
  */
-RW_REG_SCAL(clock1Delay, long, 0, block01, l);
+RW_REG_SCAL(clock1Delay, long, 0, block01, l, 32);
 
 /**
  * @brief How many ticks to wait (i.e. delay) for the 2'nd counter
  *
  * This is a Normal register.
  */
-RW_REG_SCAL(clock2Delay, long, 0, block01, l);
+RW_REG_SCAL(clock2Delay, long, 0, block01, l, 32);
 
 /**
  * @brief Output pulse counter that occured in the channel
  *
  * This is a Normal register.
  */
-RO_REG_SCAL(outputCntr, long, 0, block01, l);
+RO_REG_SCAL(outputCntr, long, 0, block01, l, 32);
 
 /**
  * @brief Current value of the 1'st counter
  *
  * This is a Normal register.
  */
-RO_REG_SCAL(cntr1CurVal, long, 0, block01, l);
+RO_REG_SCAL(cntr1CurVal, long, 0, block01, l, 32);
 
 /**
  * @brief Current value of the 2'nd counter
  *
  * This is a Normal register.
  */
-RO_REG_SCAL(cntr2CurVal, long, 0, block01, l);
+RO_REG_SCAL(cntr2CurVal, long, 0, block01, l, 32);
 
 /**
  * @brief All registers of channel 1
  *
  * This is a Normal register.
  */
-RW_REG_ARR(channel_1, long, 0, block02, l);
+RW_REG_ARR(channel_1, long, 0, block02, l, 32);
 
 /**
  * @brief All registers of channel 2
  *
  * This is a Normal register.
  */
-RW_REG_ARR(channel_2, long, 0, block03, l);
+RW_REG_ARR(channel_2, long, 0, block03, l, 32);
 
 /**
  * @brief All registers of channel 3
  *
  * This is a Normal register.
  */
-RW_REG_ARR(channel_3, long, 0, block04, l);
+RW_REG_ARR(channel_3, long, 0, block04, l, 32);
 
 /**
  * @brief All registers of channel 4
  *
  * This is a Normal register.
  */
-RW_REG_ARR(channel_4, long, 0, block05, l);
+RW_REG_ARR(channel_4, long, 0, block05, l, 32);
 
 /**
  * @brief All registers of channel 5
  *
  * This is a Normal register.
  */
-RW_REG_ARR(channel_5, long, 0, block06, l);
+RW_REG_ARR(channel_5, long, 0, block06, l, 32);
 
 /**
  * @brief All registers of channel 6
  *
  * This is a Normal register.
  */
-RW_REG_ARR(channel_6, long, 0, block07, l);
+RW_REG_ARR(channel_6, long, 0, block07, l, 32);
 
 /**
  * @brief All registers of channel 7
  *
  * This is a Normal register.
  */
-RW_REG_ARR(channel_7, long, 0, block08, l);
+RW_REG_ARR(channel_7, long, 0, block08, l, 32);
 
 /**
  * @brief All registers of channel 8
  *
  * This is a Normal register.
  */
-RW_REG_ARR(channel_8, long, 0, block09, l);
+RW_REG_ARR(channel_8, long, 0, block09, l, 32);
 
 /**
  * @brief All CTC channels to access in one chunk
  *
  * This is a Normal register.
  */
-RW_REG_ARR(ALL_CHANNELS, long, 0, block10, l);
+RW_REG_ARR(ALL_CHANNELS, long, 0, block10, l, 32);

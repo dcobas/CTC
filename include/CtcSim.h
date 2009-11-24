@@ -45,6 +45,13 @@
 #define sel poll_table_struct	/* for select entry point */
 /* only for Linux kernel */
 #include <cdcm/cdcm.h>
+#include "dg/swab-extra-linux.h"
+#endif
+
+/* for kernel only */
+#if defined(__LYNXOS) || defined (__KERNEL__)
+/* to be able to use CDCM utils inside the driver */
+#include <cdcm/cdcmBoth.h>
 #endif
 
 /* Provides debug information printing. */

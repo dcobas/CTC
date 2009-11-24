@@ -33,6 +33,8 @@ SIMULATOR := $(OBJDIR)/$(DRIVER_NAME)S.ko
 ccflags-y := \
 	-I$(M)/../include \
 	-I$(M)/../include/user \
+	-I$(ROOTDIR) \
+	-I$(ROOTDIR)/include \
 	-I$(M)/../../general
 
 PHONY += all

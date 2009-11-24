@@ -12,6 +12,6 @@ NOTE. If 'cpUsrPt' script is used to copy user-defined source code
 from one version to another - then current Driver version will be
 automatically increased by one.
 */
-#define CTC_DRVR_CURRENT_VERSION 18
+#define CTC_DRVR_CURRENT_VERSION 19
 
 #endif /* _CTC_VERSION_DRVR_H_INCLUDE_ */

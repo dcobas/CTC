@@ -3,6 +3,7 @@
 #include "dg/port_ops_lynx.h"
 #else  /* __linux__ */
 #include "dg/port_ops_linux.h"
+#include "dg/swab-extra-linux.h"
 #endif
 #include "CtcDrvr.h"
 #include "CtcUserDefinedDrvr.h"
@@ -29,11 +30,11 @@ static char Ctc_compile_date[]  = __DATE__;
 static char Ctc_compile_time[]  = __TIME__;
 
 /* which driverGen version was used to generate current code */
-static const char Ctc_version[] = "v2.1.4";
+static const char Ctc_version[] = "v2.4.13";
 
 /* generation date in hex and human representation */
-static const char Ctc_generation_time_str[] = "Wed Aug 26 15:46:08 2009";
-#define CTC_GENERATION_TIME_HEX 0x4a953ca0
+static const char Ctc_generation_time_str[] = "Tue Nov 24 09:53:46 2009";
+#define CTC_GENERATION_TIME_HEX 0x4b0b9f1a
 /* ------------------------------------------------------------------------- */
 
 /* to suppress implisit declaration warnings */
@@ -256,38 +257,40 @@ static unsigned int ComputeTime(char tStr[TSTR_LEN])
 /**
  * @brief Entry point function. Initializes minor devices.
  *
- * @param statPtr - statics table pointer
- * @param devno   - contains major/minor dev numbers
- * @param flp     - file pointer
+ * @param statPtr -- statics table pointer
+ * @param devno   -- contains major/minor dev numbers
+ * @param flp     -- file pointer
  *
- * @return OK     - if succeed.
- * @return SYSERR - in case of failure.
+ * @return OK     -- if succeed.
+ * @return SYSERR -- in case of failure.
  */
-int Ctc_open(register CTCStatics_t *statPtr, int devno, struct file *flp)
+int Ctc_open(register CTCStatics_t *statPtr,
+		     int devno, struct file *flp)
 {
-  int minN = minor(devno); /* get minor device number */
-  int proceed;	/* if standard code execution should be proceed after call to
-		   user entry point function  */
-  int usrcoco;	/* completion code of user entry point function */
+	int minN = minor(devno); /* get minor device number */
+	int proceed;	/* if standard code execution should be
+			   proceed after call to
+			   user entry point function  */
+	int usrcoco;	/* completion code of user entry point function */
 
-  /* TODO. Wrong philosophy? */
-  if (minN >= CTC_MAX_NUM_CARDS) {
-	  kkprintf("Ctc: devno is %d minN is %d. CTC_MAX_NUM_CARDS is %d\n",
-		   devno, minN, CTC_MAX_NUM_CARDS);
-    pseterr(ENXIO);
-    return(SYSERR); /* -1 */
-  }
+	if (minN >= CTC_MAX_NUM_CARDS) {
+		kkprintf("%sMinor number (%d) exceeds MAX allowed"
+			 " cards number (%d)\n",
+			 ERR_MSG, minN, CTC_MAX_NUM_CARDS);
+		pseterr(ENXIO);
+		return SYSERR; /* -1 */
+	}
 
-  kkprintf("Ctc: Open Logical Unit %d.\n", statPtr->info->mlun);
+	kkprintf("Ctc: Open Logical Unit %d.\n", statPtr->info->mlun);
 
-  /* user entry point function call */
-  usrcoco = CtcUserOpen(&proceed, statPtr, devno, flp);
-  if (!proceed) /* all done by user */
-    return(usrcoco);
+	/* user entry point function call */
+	usrcoco = CtcUserOpen(&proceed, statPtr, devno, flp);
+	if (!proceed) /* all done by user */
+		return usrcoco;
 
-  kkprintf("Ctc: Done\n\n");
+	kkprintf("Ctc: Done\n\n");
 
-  return(OK); /* 0 */
+	return OK; /* 0 */
 }
 
 
@@ -666,20 +669,38 @@ int __attribute__((weak)) unmapVmeAddr(DevInfo_t *dit)
 	return rc;
 }
 
+/*
+ * In lynx, find_controller accepts 0 as @size as a way of avoiding the
+ * test access after setting up the mapping. In Linux, however,
+ * passing 0 as @size will always fail, since this parameter is in fact
+ * the one that provides the data width for the whole mapping, and
+ * will therefore be detected as invalid; We deal with this by taking
+ * the data width from the mapping's description.
+ */
+#ifdef __linux__
+static inline void check_datawidth(unsigned long *data_width, AddrInfo_t *map)
+{
+	if (!*data_width)
+		*data_width = map->dpSize / 8;
+}
+#else
+static inline void check_datawidth(unsigned long *data_width, AddrInfo_t *map)
+{
+}
+#endif /* __linux__ */
+
 /**
  * @brief Maps VME address space into PCI address space.
  *
  * @param info     -- dev info table
- * @param infoBase -- base address
- * @param am       -- addr modifier (DG_AM_SH, DG_AM_ST, DG_AM_EX, DG_AM_CR)
- * @param len      -- address range
+ * @param map	   -- mapping descriptor
  * @param err      -- error number will go here in case of error
  *
  * @return -1			 - if FAILS.
  * @return mapped device address - if SUCCEED.
  */
-static kaddr_t MapVMEaddress(DevInfo_t *info, kaddr_t infoBase, vmeam_t am,
-			     unsigned long len, int *err)
+static kaddr_t MapVMEaddress(DevInfo_t *info, AddrInfo_t *map, int *err)
+
 {
 	struct pdparam_master param; /* CES structure containing VME access
 					parameters */
@@ -691,6 +712,9 @@ static kaddr_t MapVMEaddress(DevInfo_t *info, kaddr_t infoBase, vmeam_t am,
 				       (4 bytes each) will be read from
 				       memory */
 	kaddr_t k_addr;  /*  */
+	kaddr_t		infoBase	= map->baseAddr;
+	unsigned long	len		= map->range;
+	vmeam_t		am		= map->addrModif;
 
 	/* Compute address in system space */
 	/* CES: build an address window (64 kbyte) for
@@ -750,6 +774,12 @@ static kaddr_t MapVMEaddress(DevInfo_t *info, kaddr_t infoBase, vmeam_t am,
 		}
 		kkprintf("+--------------------------------------\n\n");
 	}
+
+	/*
+	 * the behaviour of @size in find_controller differs
+	 * among platforms: make sure anything blows up
+	 */
+	check_datawidth(&size, map);
 
 	if (info->debugFlag & DBGINSTL)
 		kkprintf("find_controller() call - ");
@@ -817,9 +847,7 @@ static int MapAndCheckDevice(DevInfo_t *info)
 	for (cntr = 0; cntr < ASA; cntr++) {
 		/* move through all address spaces */
 		if (aitptr->baseAddr != ADCG__NO_ADDRESS) {
-			mapped_addr = MapVMEaddress(info, aitptr->baseAddr,
-						    aitptr->addrModif,
-						    aitptr->range, &res);
+			mapped_addr = MapVMEaddress(info, aitptr, &res);
 			if (mapped_addr != -1) {
 				/* overwrite with mapped base address */
 				aitptr->baseAddr = mapped_addr;

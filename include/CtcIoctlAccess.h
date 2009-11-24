@@ -3,7 +3,7 @@
 
 #include "./user/CtcUserDefinedAccess.h"
 
-/* this  API is obsolete! */
+/* this API is obsolete! */
 #warning WARNING! Deprecated library. Use DrvrAccess library instead.
 
 #ifdef __cplusplus

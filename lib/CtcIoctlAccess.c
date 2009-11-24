@@ -22,8 +22,9 @@
  * @param chanN -- Minor Device Number. There can be several entry points for
  *                 current Logical Unit Number (ChannelNumber).
  *
- * @return Open file decriptor(normally >= 3) - if success.
- * @return -1 - if fails. Error message is printing out.
+ * @return Open file decriptor (normally >= 3) - if success
+ * @return -1                                  - if fails
+ *                                               Error message is printing out.
  */
 int CtcEnableAccess(int lun, int chanN)
 {
@@ -52,7 +53,6 @@ int CtcEnableAccess(int lun, int chanN)
 
 	return fd;
 }
-
 
 /**
  * @brief  Close driver file descriptor.
@@ -142,9 +142,9 @@ int CtcSetCNTR_ENABLE(
 	unsigned long arguments[3];
 
 	/* pack ioctl args */
-	arguments[0] = (unsigned long) arg; /* where to take data from */
-	arguments[1] = 1;		    /* number of elements write */
-	arguments[2] = 0;		    /* element index */
+	arguments[0] = (unsigned long) &arg; /* where to take data from */
+	arguments[1] = 1;		     /* number of elements write */
+	arguments[2] = 0;		     /* element index */
 
 	/* handle endianity */
 	matchEndian((char*)&arg, sizeof(unsigned long), 0);
@@ -199,9 +199,9 @@ int CtcSetconfChan(
 	unsigned long arguments[3];
 
 	/* pack ioctl args */
-	arguments[0] = (unsigned long) arg; /* where to take data from */
-	arguments[1] = 1;		    /* number of elements write */
-	arguments[2] = 0;		    /* element index */
+	arguments[0] = (unsigned long) &arg; /* where to take data from */
+	arguments[1] = 1;		     /* number of elements write */
+	arguments[2] = 0;		     /* element index */
 
 	/* handle endianity */
 	matchEndian((char*)&arg, sizeof(unsigned long), 0);
@@ -257,8 +257,8 @@ int CtcSetclock1Delay(
 
 	/* pack ioctl args */
 	arguments[0] = (unsigned long) &arg; /* where to take data from */
-	arguments[1] = 1;		    /* number of elements write */
-	arguments[2] = 0;		    /* element index */
+	arguments[1] = 1;		     /* number of elements write */
+	arguments[2] = 0;		     /* element index */
 
 	/* handle endianity */
 	matchEndian((char*)&arg, sizeof(unsigned long), 0);
@@ -314,8 +314,8 @@ int CtcSetclock2Delay(
 
 	/* pack ioctl args */
 	arguments[0] = (unsigned long) &arg; /* where to take data from */
-	arguments[1] = 1;		    /* number of elements write */
-	arguments[2] = 0;		    /* element index */
+	arguments[1] = 1;		     /* number of elements write */
+	arguments[2] = 0;		     /* element index */
 
 	/* handle endianity */
 	matchEndian((char*)&arg, sizeof(unsigned long), 0);

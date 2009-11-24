@@ -3,6 +3,7 @@
 #include "dg/port_ops_lynx.h"
 #else  /* __linux__ */
 #include "dg/port_ops_linux.h"
+#include "dg/swab-extra-linux.h"
 #endif
 #include "CtcSim.h"
 #include "CtcUserDefinedSim.h"
@@ -29,11 +30,11 @@ static char Ctc_compile_date[]  = __DATE__;
 static char Ctc_compile_time[]  = __TIME__;
 
 /* which driverGen version was used to generate current code */
-static const char Ctc_version[] = "v2.1.4";
+static const char Ctc_version[] = "v2.4.13";
 
 /* generation date in hex and human representation */
-static const char Ctc_generation_time_str[] = "Wed Aug 26 15:46:08 2009";
-#define CTC_GENERATION_TIME_HEX 0x4a953ca0
+static const char Ctc_generation_time_str[] = "Tue Nov 24 09:53:46 2009";
+#define CTC_GENERATION_TIME_HEX 0x4b0b9f1a
 /* ------------------------------------------------------------------------- */
 
 /* to suppress implisit declaration warnings */
@@ -256,36 +257,40 @@ static unsigned int ComputeTime(char tStr[TSTR_LEN])
 /**
  * @brief Entry point function. Initializes minor devices.
  *
- * @param statPtr - statics table pointer
- * @param devno   - contains major/minor dev numbers
- * @param flp     - file pointer
+ * @param statPtr -- statics table pointer
+ * @param devno   -- contains major/minor dev numbers
+ * @param flp     -- file pointer
  *
- * @return OK     - if succeed.
- * @return SYSERR - in case of failure.
+ * @return OK     -- if succeed.
+ * @return SYSERR -- in case of failure.
  */
-int Ctc_open(register CTCStatics_t *statPtr, int devno, struct file *flp)
+int Ctc_open(register CTCStatics_t *statPtr,
+		     int devno, struct file *flp)
 {
-  int minN = minor(devno); /* get minor device number */
-  int proceed;	/* if standard code execution should be proceed after call to
-		   user entry point function  */
-  int usrcoco;	/* completion code of user entry point function */
+	int minN = minor(devno); /* get minor device number */
+	int proceed;	/* if standard code execution should be
+			   proceed after call to
+			   user entry point function  */
+	int usrcoco;	/* completion code of user entry point function */
 
-  /* TODO. Wrong philosophy? */
-  if (minN >= CTC_MAX_NUM_CARDS) {
-    pseterr(ENXIO);
-    return(SYSERR); /* -1 */
-  }
+	if (minN >= CTC_MAX_NUM_CARDS) {
+		kkprintf("%sMinor number (%d) exceeds MAX allowed"
+			 " cards number (%d)\n",
+			 ERR_MSG, minN, CTC_MAX_NUM_CARDS);
+		pseterr(ENXIO);
+		return SYSERR; /* -1 */
+	}
 
-  kkprintf("Ctc: Open Logical Unit %d.\n", statPtr->info->mlun);
+	kkprintf("Ctc: Open Logical Unit %d.\n", statPtr->info->mlun);
 
-  /* user entry point function call */
-  usrcoco = CtcUserOpen(&proceed, statPtr, devno, flp);
-  if (!proceed) /* all done by user */
-    return(usrcoco);
+	/* user entry point function call */
+	usrcoco = CtcUserOpen(&proceed, statPtr, devno, flp);
+	if (!proceed) /* all done by user */
+		return usrcoco;
 
-  kkprintf("Ctc: Done\n\n");
+	kkprintf("Ctc: Done\n\n");
 
-  return(OK); /* 0 */
+	return OK; /* 0 */
 }
 
 
