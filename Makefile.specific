@@ -18,6 +18,6 @@ ifeq ($(CPU), ppc4)
 else ifeq ($(CPU), L865)
 	#KVER = 2.6.24.7-rt27
 
-	KVER = 2.6.29.4-rt15
-	#KVER = 2.6.31.6-rt19
+	#KVER = 2.6.29.4-rt15
+	KVER = 2.6.31.6-rt19
 endif
