@@ -1,0 +1,23 @@
+                            LOCAL FILE NAMING CONVENTION
+                            ----------------------------
+   If you will add your own driver or simulator sourse files to this directory,
+than you should keep in mind the naming convention rule:
+
+If the files are for real driver - than they should end with "Drvr.c" suffix!
+For example:
+     MyAddedSrcDrvr.c
+               |----|
+                 |
+                 V
+             Required suffix for added driver src code.
+
+If the files are for simulator - than they should end with "Sim.c" suffix!
+For example:
+     MyAddedSrcSim.c
+               |---|
+                 |
+                 V
+             Required suffix for added simulator src code.
+
+
+This convention is used in Makefiles for source code compilation.

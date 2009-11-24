@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo 8 > /proc/sys/kernel/printk
+
+../../general/ins_rm_mod/dgmodinst.L865 -U-1 -, -U-2 -, -U-3 -, -U-4 -, -U-5
