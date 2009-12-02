@@ -30,6 +30,37 @@ static void local_clear_screen()
   printf("%s", ClearScreen);
 }
 
+/* get Output Channel */
+static int get_output_ch(int first)
+{
+	int outch;
+
+	printf("Output channel[%d - 8] -> ", first);
+	scanf("%d", &outch);
+	getchar();
+	if (!WITHIN_RANGE(first, outch, L_OUT_CH)) {
+		printf("ERROR! out-of-range [%d - %d]\n",
+		       F_OUT_CH, L_OUT_CH);
+		return -1;
+	}
+	return outch;
+}
+
+/* get Input Channel */
+static int get_input_ch(void)
+{
+	int inpch;
+
+	printf("Input channel[1 - 40] -> ");
+	scanf("%d", &inpch);
+	getchar();
+	if (!WITHIN_RANGE(F_INP_CH, inpch, L_INP_CH)) {
+		printf("ERROR! out-of-range [%d - %d]\n",
+		       F_OUT_CH, L_OUT_CH);
+		return -1;
+	}
+	return inpch;
+}
 
 /**
  * @brief
@@ -229,7 +260,7 @@ static int printout_conf_reg(HANDLE handle, int lun, int chan)
 static int run_test_bench(HANDLE handle, int lun)
 {
 	//int rc, data;
-	//_dal_h *ditp = (_dal_h*)container_of(&handle, struct _tagDALH, hID);
+	//_dal_h *ditp = (_dal_h*)container_of((void*)handle, struct _tagDALH, hID);
 
 	ioctl(DaGetNodeFd(handle), CTC_TEST_BENCH, NULL);
 
@@ -304,57 +335,38 @@ int UserDefinedMenu(HANDLE handle, int lun)
     case 14:
 	    return run_test_bench(handle, lun);
     case 13:
-    {
-	    int outch;
+	    {
+		    int outch = get_output_ch(F_OUT_CH);
 
-	    /* get Output Channel */
-	    printf("Output channel[1 - 8] -> ");
-	    scanf("%d", &outch);
-	    getchar();
-	    if (!WITHIN_RANGE(F_INP_CH, outch, L_INP_CH)) {
-		    printf("ERROR! out-of-range [%d - %d]\n",
-			   F_OUT_CH, L_OUT_CH);
 		    do_usr_wait = 1;
+
+		    if (outch == -1)
+			    break;
+
+		    if ( (cc = ctc_disableChannel(handle, outch)) )
+			    printf("Failed to disable output"
+				   " channel (cc = %d)\n", cc);
+
 		    break;
 	    }
-	    if ( (cc = ctc_disableChannel(handle, outch)) ) {
-		    printf("Failed to disable output channel (cc = %d)\n", cc);
-		    do_usr_wait = 1;
-	    }
-	    break;
-    }
     case 12:
-    {
-	    int outch, inpch;
+	    {
+		    int outch, inpch;
 
-	    /* get Output Channel */
-	    printf("Output channel[1 - 8] -> ");
-	    scanf("%d", &outch);
-	    getchar();
-	    if (!WITHIN_RANGE(F_INP_CH, outch, L_INP_CH)) {
-		    printf("ERROR! out-of-range [%d - %d]\n",
-			   F_OUT_CH, L_OUT_CH);
 		    do_usr_wait = 1;
+		    outch = get_output_ch(F_OUT_CH);
+		    if (outch == -1)
+			    break;
+
+		    inpch = get_input_ch();
+		    if (inpch == -1)
+			    break;
+
+		    if ( (cc = ctc_enableChannel(handle, outch, inpch)) )
+			    printf("Failed to enable output channel"
+				   " (cc = %d)\n", cc);
 		    break;
 	    }
-
-	    /* get Input Channel */
-	    printf("Input channel[1 - 40] -> ");
-	    scanf("%d", &inpch);
-	    getchar();
-	    if (!WITHIN_RANGE(F_INP_CH, inpch, L_INP_CH)) {
-		    printf("ERROR! out-of-range [%d - %d]\n",
-			   F_OUT_CH, L_OUT_CH);
-		    do_usr_wait = 1;
-		    break;
-	    }
-
-	    if ( (cc = ctc_enableChannel(handle, outch, inpch)) ) {
-		    printf("Failed to enable output channel (cc = %d)\n", cc);
-		    do_usr_wait = 1;
-	    }
-	    break;
-    }
     case 11:
       ctc_dbgPrintout(1);
       break;
