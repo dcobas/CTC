@@ -12,6 +12,6 @@ NOTE. If 'cpUsrPt' script is used to copy user-defined source code
 from one version to another - then current Simulator version will be
 automatically increased by one.
 */
-#define CTC_SIM_CURRENT_VERSION 19
+#define CTC_SIM_CURRENT_VERSION 20
 
 #endif /* _CTC_VERSION_SIM_H_INCLUDE_ */

@@ -30,11 +30,11 @@ static char Ctc_compile_date[]  = __DATE__;
 static char Ctc_compile_time[]  = __TIME__;
 
 /* which driverGen version was used to generate current code */
-static const char Ctc_version[] = "v2.4.13";
+static const char Ctc_version[] = "v2.6.11";
 
 /* generation date in hex and human representation */
-static const char Ctc_generation_time_str[] = "Tue Nov 24 09:53:46 2009";
-#define CTC_GENERATION_TIME_HEX 0x4b0b9f1a
+static const char Ctc_generation_time_str[] = "Wed Feb 24 11:05:23 2010";
+#define CTC_GENERATION_TIME_HEX 0x4b84f9e3
 /* ------------------------------------------------------------------------- */
 
 /* to suppress implisit declaration warnings */
@@ -455,7 +455,7 @@ int Ctc_ioctl(register CTCStatics_t *s,
 	int minN;     /* minor device number (LUN) */
 	int proceed;  /* if standard code execution should be proceed after
 			 call to user entry point function  */
-	int usrcoco;  /* completion code of user entry point function */
+	int rc;  /* return code */
 	int r_rw = 0; /* repetitive r/w (1 - yes, 0 - no) */
 
 	START_TIME_STAT(); /* timing measurements */
@@ -467,129 +467,131 @@ int Ctc_ioctl(register CTCStatics_t *s,
 #endif
 
 	/* user entry point function call */
-	usrcoco = CtcUserIoctl(&proceed, s, f, minN, com, arg);
+	rc = CtcUserIoctl(&proceed, s, f, minN, com, arg);
 	if (!proceed) /* all done by user */
-		return usrcoco;
+		goto out_ioctl;
 
  rep_ioctl:
 	switch (com) { /* default 'ioctl' driver operations */
 	case SRV_GET_DEBUG_FLAG:
-		return get___SRV__DEBUG_FLAG(s, arg, c_rwb, r_rw);
+		rc = get___SRV__DEBUG_FLAG(s, arg, c_rwb, r_rw);
 		break;
 	case SRV_SET_DEBUG_FLAG:
-		return set___SRV__DEBUG_FLAG(s, arg, c_rwb, r_rw);
+		rc = set___SRV__DEBUG_FLAG(s, arg, c_rwb, r_rw);
 		break;
 	case SRV_GET_DEVINFO_T:
-		return get___SRV__DEVINFO_T(s, arg, c_rwb, r_rw);
+		rc = get___SRV__DEVINFO_T(s, arg, c_rwb, r_rw);
 		break;
 	case SRV_GET_DRVR_VERS:
-		return get___SRV__DRVR_VERS(s, arg, c_rwb, r_rw);
+		rc = get___SRV__DRVR_VERS(s, arg, c_rwb, r_rw);
 		break;
 	case SRV_GET_DAL_CONSISTENT:
-		return get___SRV__DAL_CONSISTENT(s, arg, c_rwb, r_rw);
+		rc = get___SRV__DAL_CONSISTENT(s, arg, c_rwb, r_rw);
 		break;
 	case SRV__REP_REG_RW:
-		return srv_func___SRV__REP_REG_RW(s, arg, c_rwb, r_rw);
+		rc = srv_func___SRV__REP_REG_RW(s, arg, c_rwb, r_rw);
 		break;
 	case SRV__RW_BOUNDS:
-		return srv_func___SRV__RW_BOUNDS(s, arg, c_rwb, r_rw);
+		rc = srv_func___SRV__RW_BOUNDS(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_STATUS:
-		return get_STATUS(s, arg, c_rwb, r_rw);
+		rc = get_STATUS(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CNTR_ENABLE:
-		return get_CNTR_ENABLE(s, arg, c_rwb, r_rw);
+		rc = get_CNTR_ENABLE(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CNTR_ENABLE:
-		return set_CNTR_ENABLE(s, arg, c_rwb, r_rw);
+		rc = set_CNTR_ENABLE(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CONFCHAN:
-		return get_confChan(s, arg, c_rwb, r_rw);
+		rc = get_confChan(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CONFCHAN:
-		return set_confChan(s, arg, c_rwb, r_rw);
+		rc = set_confChan(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CLOCK1DELAY:
-		return get_clock1Delay(s, arg, c_rwb, r_rw);
+		rc = get_clock1Delay(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CLOCK1DELAY:
-		return set_clock1Delay(s, arg, c_rwb, r_rw);
+		rc = set_clock1Delay(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CLOCK2DELAY:
-		return get_clock2Delay(s, arg, c_rwb, r_rw);
+		rc = get_clock2Delay(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CLOCK2DELAY:
-		return set_clock2Delay(s, arg, c_rwb, r_rw);
+		rc = set_clock2Delay(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_OUTPUTCNTR:
-		return get_outputCntr(s, arg, c_rwb, r_rw);
+		rc = get_outputCntr(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CNTR1CURVAL:
-		return get_cntr1CurVal(s, arg, c_rwb, r_rw);
+		rc = get_cntr1CurVal(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CNTR2CURVAL:
-		return get_cntr2CurVal(s, arg, c_rwb, r_rw);
+		rc = get_cntr2CurVal(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CHANNEL_1:
-		return get_channel_1(s, arg, c_rwb, r_rw);
+		rc = get_channel_1(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CHANNEL_1:
-		return set_channel_1(s, arg, c_rwb, r_rw);
+		rc = set_channel_1(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CHANNEL_2:
-		return get_channel_2(s, arg, c_rwb, r_rw);
+		rc = get_channel_2(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CHANNEL_2:
-		return set_channel_2(s, arg, c_rwb, r_rw);
+		rc = set_channel_2(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CHANNEL_3:
-		return get_channel_3(s, arg, c_rwb, r_rw);
+		rc = get_channel_3(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CHANNEL_3:
-		return set_channel_3(s, arg, c_rwb, r_rw);
+		rc = set_channel_3(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CHANNEL_4:
-		return get_channel_4(s, arg, c_rwb, r_rw);
+		rc = get_channel_4(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CHANNEL_4:
-		return set_channel_4(s, arg, c_rwb, r_rw);
+		rc = set_channel_4(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CHANNEL_5:
-		return get_channel_5(s, arg, c_rwb, r_rw);
+		rc = get_channel_5(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CHANNEL_5:
-		return set_channel_5(s, arg, c_rwb, r_rw);
+		rc = set_channel_5(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CHANNEL_6:
-		return get_channel_6(s, arg, c_rwb, r_rw);
+		rc = get_channel_6(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CHANNEL_6:
-		return set_channel_6(s, arg, c_rwb, r_rw);
+		rc = set_channel_6(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CHANNEL_7:
-		return get_channel_7(s, arg, c_rwb, r_rw);
+		rc = get_channel_7(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CHANNEL_7:
-		return set_channel_7(s, arg, c_rwb, r_rw);
+		rc = set_channel_7(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_CHANNEL_8:
-		return get_channel_8(s, arg, c_rwb, r_rw);
+		rc = get_channel_8(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_CHANNEL_8:
-		return set_channel_8(s, arg, c_rwb, r_rw);
+		rc = set_channel_8(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_GET_ALL_CHANNELS:
-		return get_ALL_CHANNELS(s, arg, c_rwb, r_rw);
+		rc = get_ALL_CHANNELS(s, arg, c_rwb, r_rw);
 		break;
 	case CTC_SET_ALL_CHANNELS:
-		return set_ALL_CHANNELS(s, arg, c_rwb, r_rw);
+		rc = set_ALL_CHANNELS(s, arg, c_rwb, r_rw);
 		break;
 	default:
 		pseterr(EINVAL);
-		return SYSERR; /* -1 */
+		rc = SYSERR; /* -1 */
+                break;
 	} /* end of 'ioctl' operations switch */
 
-	return OK; /* 0 */
+ out_ioctl:
+	return rc;
 }
 
 

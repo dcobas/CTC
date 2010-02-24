@@ -319,7 +319,8 @@ int get_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 	/* read from device */						\
 	if (r_rw)							\
 		/* repetitive read access */				\
-		__rep_in##_r_port_op((__port_addr_t)regp, uaddr, rcntr*rwoa); \
+		__rep_in##_r_port_op##_delay((__port_addr_t)regp, uaddr, \
+					     rcntr*rwoa, _r_tloop);	\
 	else								\
 		__rep_in##_r_port_op##_delay_shift((__port_addr_t)regp, uaddr, \
 					   rwoa, _r_tloop);		\
@@ -401,7 +402,8 @@ int get_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 									\
 	if (r_rw)							\
 		/* repetitive read access */				\
-		__rep_in##_r_port_op((__port_addr_t)regp, uaddr, rcntr * rwoa);	\
+		__rep_in##_r_port_op##_delay((__port_addr_t)regp, uaddr, \
+					     rcntr * rwoa, _r_tloop);	\
 	else								\
 		/* all OK - put data in the user buffer */		\
 		__rep_in##_r_port_op##_delay_shift((__port_addr_t)regp, uaddr, \
@@ -490,7 +492,8 @@ int set_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 			swap_data((char *)uaddr, rcntr, dg_swa##_r_port_op##_rsz); \
 									\
 		/* write into hw */					\
-		__rep_out##_r_port_op((__port_addr_t)regp, uaddr, rcntr * rwoa); \
+		__rep_out##_r_port_op##_delay((__port_addr_t)regp, uaddr, \
+					      rcntr * rwoa, _r_tloop);	\
 	} else { /* single write */					\
 									\
 		/* save last written values (if write-only reg) */	\
@@ -595,7 +598,8 @@ int set_##_r_nm(register CTCStatics_t *s, char *ioctlarg,	\
 			swap_data((char *)uaddr, rcntr, dg_swa##_r_port_op##_rsz); \
 									\
 		/* write into hw */					\
-		__rep_out##_r_port_op((__port_addr_t)regp, uaddr, rcntr * rwoa); \
+		__rep_out##_r_port_op##_delay((__port_addr_t)regp, uaddr, \
+					      rcntr * rwoa, _r_tloop);	\
 	} else { /* multiple writes */					\
 									\
 		/* save last written values (if write-only reg) */	\
