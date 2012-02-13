@@ -1,1 +1,3 @@
-makefiles/Kbuild
+EXTRA_CFLAGS += -I /acc/local/$(CPU)/include
+
+obj-m := ctc.o
